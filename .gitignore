@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.py[cod]
+*.so
+.Python
+env/
+venv/
+.env
+*.egg-info/
+dist/
+build/
+
+# ML models & data (large files)
+*.pkl
+*.h5
+*.csv
+data/
+sapimouse/
+bezier_actions/
+generated_actions/
+equidistant_actions/
+TRAINED_MODELS/
+TRAINING_CURVES/
+
+# Docker
+*.log
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db

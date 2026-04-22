@@ -1,0 +1,59 @@
+services:
+  redis:
+    image: redis/redis-stack-server:latest
+    container_name: clickguard-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - clickguard-net
+
+  postgres:
+    image: postgres:15
+    container_name: clickguard-postgres
+    environment:
+      POSTGRES_USER: clickguard
+      POSTGRES_PASSWORD: clickguard
+      POSTGRES_DB: clickguard
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - clickguard-net
+
+  backend:
+    build: ./backend
+    container_name: clickguard-backend
+    ports:
+      - "8000:8000"
+    depends_on:
+      - redis
+      - postgres
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - DATABASE_URL=postgresql://clickguard:clickguard@postgres:5432/clickguard
+    volumes:
+      - ./backend:/app
+    networks:
+      - clickguard-net
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+  frontend:
+    build: ./frontend
+    container_name: clickguard-frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    networks:
+      - clickguard-net
+
+volumes:
+  redis-data:
+  postgres-data:
+
+networks:
+  clickguard-net:
+    driver: bridge
