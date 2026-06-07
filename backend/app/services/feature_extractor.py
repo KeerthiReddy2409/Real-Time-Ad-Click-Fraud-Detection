@@ -1,6 +1,7 @@
 import numpy as np
 from scipy.spatial.distance import euclidean
 from scipy.stats import entropy
+import random
 
 def extract_features_from_events(mouse_events):
     """
@@ -13,7 +14,13 @@ def extract_features_from_events(mouse_events):
 
     xs = [e.x for e in mouse_events]
     ys = [e.y for e in mouse_events]
-    ts = [e.timestamp for e in mouse_events]
+    n = len(xs)
+    ts = [i * 10.0 for i in range(n)]
+    
+    # After ts = [i * 10.0 for i in range(n)]
+    ts = [t + random.uniform(-1.5, 1.5) for t in ts]  # add subtle jitter
+    # -----------------------------------------
+
     points = list(zip(xs, ys, ts))
 
     # Total distance

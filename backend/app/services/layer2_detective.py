@@ -37,7 +37,7 @@ class Layer2Detective:
         proba = self.model.predict_proba(X_scaled)[0]
         pred = self.model.predict(X_scaled)[0]
 
-        verdict = "bot" if pred == 1 and proba[1] > 0.7 else "human"
+        verdict = "bot" if proba[1] > 0.5 else "human"
         confidence = float(proba[1] if pred == 1 else proba[0])
         risk_score = float(proba[1])
 

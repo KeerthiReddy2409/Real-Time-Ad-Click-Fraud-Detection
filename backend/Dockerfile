@@ -22,7 +22,8 @@ RUN pip install --no-cache-dir --default-timeout=100 --retries=5 -r requirements
 
 # Copy application code
 COPY . .
-
+COPY demo_trajectories /app/demo_trajectories
+COPY high_conf_bots.json /app/high_conf_bots.json
 EXPOSE 8000
 
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]

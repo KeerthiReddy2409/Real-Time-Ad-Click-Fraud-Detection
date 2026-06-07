@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Trajectory Recorder</title>
+    <style>
+        body { font-family: sans-serif; margin: 40px; }
+        button { padding: 10px 20px; margin: 10px; font-size: 16px; }
+        #status { font-weight: bold; }
+    </style>
+</head>
+<body>
+    <h1>Mouse Trajectory Recorder</h1>
+    <p id="status">Idle</p>
+    <button id="startBtn">🔴 Start Recording</button>
+    <button id="stopBtn" disabled>⏹ Stop & Download</button>
+    <script>
+        let events = [];
+        let recording = false;
+
+        function onMouseMove(e) {
+            if (!recording) return;
+            events.push({
+                x: e.clientX,
+                y: e.clientY,
+                timestamp: performance.now()
+            });
+            if (events.length > 500) events.shift();
+        }
+
+        document.getElementById('startBtn').onclick = () => {
+            events = [];
+            recording = true;
+            document.getElementById('startBtn').disabled = true;
+            document.getElementById('stopBtn').disabled = false;
+            document.getElementById('status').textContent = 'Recording...';
+        };
+
+        document.getElementById('stopBtn').onclick = () => {
+            recording = false;
+            document.getElementById('startBtn').disabled = false;
+            document.getElementById('stopBtn').disabled = true;
+            document.getElementById('status').textContent = `Recorded ${events.length} points.`;
+
+            // Download as JSON
+            const blob = new Blob([JSON.stringify(events, null, 2)], { type: 'application/json' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = `trajectory_${Date.now()}.json`;
+            a.click();
+            events = [];
+        };
+
+        document.addEventListener('mousemove', onMouseMove);
+    </script>
+</body>
+</html>

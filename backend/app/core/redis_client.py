@@ -44,24 +44,22 @@ class RedisClient:
     
     # ---------- Sliding Window Rate Limiter ----------
     async def check_rate_limit(self, ip: str, max_requests: int = 30, window_sec: int = 60) -> bool:
-        """
-        Returns True if under limit, False if rate exceeded.
-        Uses Redis sorted set with sliding window.
-        """
         key = f"rate_limit:{ip}"
         time_result = await self.client.time()
-        now = time_result[0]  # Unix timestamp as integer
-        
-        # Remove old entries
+        now = time_result[0]  # seconds (integer)
+
+        # Remove entries older than the window
         await self.client.zremrangebyscore(key, 0, now - window_sec)
-        
-        # Count current window
+
+        # Count current entries
         count = await self.client.zcard(key)
         if count >= max_requests:
             return False
-        
-        # Add current request
-        await self.client.zadd(key, {str(now): now})
+
+        # Add current request with a UNIQUE member (prevents overwriting within same second)
+        import random
+        member = f"{now}:{random.randint(1000, 9999)}"
+        await self.client.zadd(key, {member: now})
         await self.client.expire(key, window_sec + 10)
         return True
     

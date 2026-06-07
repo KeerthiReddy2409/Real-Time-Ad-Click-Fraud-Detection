@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Real‑Time Ad Click Fraud Detection</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body {
+            background: #0a0f1e;
+            color: #cbd5e1;
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            display: flex;
+            min-height: 100vh;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            width: 260px;
+            background: #0f172a;
+            border-right: 1px solid #1e293b;
+            display: flex; flex-direction: column;
+            padding: 24px 0;
+            position: fixed; top: 0; left: 0; bottom: 0;
+            z-index: 100;
+        }
+        .sidebar .logo {
+            padding: 0 24px 24px;
+            font-size: 1.15rem; font-weight: 600;
+            color: #f1f5f9;
+            letter-spacing: -0.3px;
+        }
+        .sidebar nav { display: flex; flex-direction: column; gap: 4px; margin-bottom: auto; }
+        .sidebar-btn {
+            background: transparent; color: #94a3b8;
+            border: none; padding: 10px 24px; text-align: left;
+            font-size: 0.92rem; cursor: pointer; transition: 0.15s;
+            display: flex; align-items: center; gap: 8px;
+        }
+        .sidebar-btn:hover { background: #1e293b; color: #e2e8f0; }
+        .sidebar-btn.active { background: #2563eb; color: #fff; border-radius: 0 6px 6px 0; }
+        .sidebar-btn .icon { font-size: 1.1rem; width: 20px; text-align: center; }
+
+        .sidebar .gauge-section {
+            padding: 20px 24px;
+            border-top: 1px solid #1e293b;
+            margin-top: auto;
+        }
+        .gauge-label {
+            font-size: 0.7rem; text-transform: uppercase;
+            color: #64748b; margin-bottom: 8px;
+        }
+        .gauge-wrapper { width: 120px; height: 60px; margin: 0 auto; }
+        .gauge-value { text-align: center; font-size: 0.85rem; color: #e2e8f0; margin-top: 4px; }
+
+        /* Main content */
+        .main-content {
+            margin-left: 260px; flex: 1; padding: 32px 36px;
+        }
+        .page-title {
+            font-size: 1.5rem; font-weight: 600;
+            color: #f8fafc; margin-bottom: 28px;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 16px; margin-bottom: 24px;
+        }
+        .card {
+            background: #1e293b; border-radius: 10px;
+            padding: 18px 20px; border: 1px solid #334155;
+        }
+        .card h3 {
+            font-size: 0.75rem; text-transform: uppercase;
+            color: #64748b; margin-bottom: 6px; font-weight: 500;
+        }
+        .card .value { font-size: 2.1rem; font-weight: 600; }
+        .card.human .value { color: #22c55e; }
+        .card.bot .value { color: #ef4444; }
+        .card.rate-limit .value { color: #f59e0b; }
+        .card.vpn .value { color: #8b5cf6; }
+        .card.roi .value { color: #fbbf24; }
+
+        .demo-bar {
+            display: flex; flex-wrap: wrap; gap: 8px;
+            align-items: center; margin-bottom: 24px;
+        }
+        .demo-btn {
+            background: #1e293b; color: #cbd5e1;
+            border: 1px solid #334155; padding: 8px 16px;
+            border-radius: 6px; font-size: 0.85rem; cursor: pointer;
+            transition: 0.15s;
+        }
+        .demo-btn:hover { background: #334155; border-color: #475569; }
+        .demo-btn:active { background: #2563eb; border-color: #2563eb; color: #fff; }
+
+        .cpc-input {
+            background: #1e293b; color: #cbd5e1;
+            border: 1px solid #334155; padding: 8px 12px;
+            border-radius: 6px; font-size: 0.85rem; width: 80px;
+            margin-left: 16px;
+        }
+
+        .live-log {
+            background: #0f172a;
+            border: 1px solid #1e293b;
+            border-radius: 8px;
+            height: 420px;
+            overflow-y: auto;
+            font-family: 'JetBrains Mono', 'Fira Code', monospace;
+            font-size: 0.8rem;
+            line-height: 1.4;
+        }
+        .log-entry {
+            display: flex;
+            align-items: center;
+            padding: 4px 10px;
+            border-left: 3px solid transparent;
+            transition: background 0.1s;
+            flex-wrap: wrap;
+        }
+        .log-entry:hover { background: #1e293b; }
+        .log-entry.human { border-left-color: #22c55e; }
+        .log-entry.bot { border-left-color: #ef4444; }
+        .log-entry .badge {
+            display: inline-block;
+            padding: 1px 5px;
+            border-radius: 3px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            margin-left: 4px;
+            white-space: nowrap;
+        }
+        .badge.l1 { background: #f59e0b; color: #000; }
+        .badge.l2 { background: #2563eb; color: #fff; }
+        .badge.vpn { background: #8b5cf6; color: #fff; }
+        .badge.blacklist { background: #dc2626; color: #fff; }
+        /* Tabs & modal */
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000; }
+        .modal-content { background: #1e293b; margin: 60px auto; padding: 24px; border-radius: 10px; max-width: 800px; position: relative; max-height: 80vh;
+            overflow-y: auto;}
+        .close-btn { position: absolute; top: 12px; right: 20px; font-size: 1.5rem; cursor: pointer; color: #94a3b8; }
+
+        /* IP groups (forensics) */
+        .ip-group { background: #1e293b; border-radius: 8px; padding: 12px; margin-bottom: 10px; border: 1px solid #334155; }
+        .ip-group-header { cursor: pointer; font-weight: bold; display: flex; justify-content: space-between; user-select: none; }
+        .session-sublist { margin-top: 8px; padding-left: 15px; border-left: 2px solid #334155; }
+        .session-sublist .log-entry { cursor: pointer; padding: 4px 8px; border-left: 3px solid #22c55e; margin: 2px 0; }
+        .session-sublist .log-entry.bot { border-left-color: #ef4444; }
+                .blocklist-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-top: 15px;
+        }
+        .blocklist-container span {
+            background: #dc2626;
+            color: white;
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            word-break: break-all;
+            max-width: 150px;
+        }
+        .ip-row:hover { background: #1e293b; }
+        .ip-row:hover td { color: #fff; }
+        .ip-sessions .log-entry { cursor: pointer; }
+    </style>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<aside class="sidebar">
+    <div class="logo">Fraud Detection</div>
+    <nav>
+        <button class="sidebar-btn active" onclick="switchTab('live', this)">
+            <span class="icon">●</span> Live Monitor
+        </button>
+        <button class="sidebar-btn" onclick="switchTab('blocklist', this)">
+            <span class="icon">⊘</span> Blocklist
+        </button>
+        <button class="sidebar-btn" onclick="switchTab('forensics', this)">
+            <span class="icon">⊞</span> Forensics
+        </button>
+        <button class="sidebar-btn" onclick="switchTab('settings', this)">
+            <span class="icon">⚙</span> Settings
+        </button>
+    </nav>
+    <div class="gauge-section">
+        <div class="gauge-label">Live Risk</div>
+        <div class="gauge-wrapper"><canvas id="riskGauge"></canvas></div>
+        <div class="gauge-value" id="gaugeValue">0%</div>
+    </div>
+</aside>
+
+<!-- MAIN -->
+<main class="main-content">
+
+    <!-- LIVE MONITOR -->
+    <div id="live-tab" class="tab-content active">
+        <div class="page-title">Real‑Time Monitoring</div>
+        <div class="demo-bar">
+            <button class="demo-btn" onclick="demoHuman()">Human Click</button>
+            <button class="demo-btn" onclick="demoBot()">Bot Click</button>
+            <button class="demo-btn" onclick="demoRateLimit()">Rate‑Limit Attack</button>
+            <button class="demo-btn" onclick="demoMix()">Mixed Traffic</button>
+            <label style="margin-left:20px; font-size:0.85rem;">Avg CPC $</label>
+            <input type="number" id="cpcInput" class="cpc-input" value="2.50" step="0.01" onchange="updateCPC()">
+        </div>
+        <div class="stats-grid">
+            <div class="card human"><h3>Human</h3><div class="value" id="humanCount">0</div></div>
+            <div class="card bot"><h3>Bots Blocked</h3><div class="value" id="botCount">0</div></div>
+            <div class="card rate-limit"><h3>Rate‑Limited</h3><div class="value" id="rlCount">0</div></div>
+            <div class="card vpn"><h3>VPN</h3><div class="value" id="vpnCount">0</div></div>
+            <div class="card roi"><h3>Budget Saved</h3><div class="value" id="budgetSaved">$0.00</div></div>
+        </div>
+        <div class="live-log" id="live-log"></div>
+    </div>
+
+    <!-- BLOCKLIST -->
+    <div id="blocklist-tab" class="tab-content">
+        <div style="background:#1e293b; border-radius:12px; padding:25px;">
+            <h2>IP Blocklist</h2>
+            <div style="display:flex; gap:10px; margin:20px 0;">
+                <input type="text" id="blocklistIpInput" placeholder="IP to block/unblock" style="padding:10px; border-radius:8px; border:1px solid #475569; background:#0b1120; color:#e2e8f0; width:220px;">
+                <button onclick="addToBlocklist()" style="background:#ef4444; color:#fff; border:none; padding:10px 18px; border-radius:8px; cursor:pointer;">Block</button>
+                <button onclick="removeFromBlocklist()" style="background:#f59e0b; color:#000; border:none; padding:10px 18px; border-radius:8px; cursor:pointer;">Unblock</button>
+                <button onclick="refreshBlocklist()" style="background:#334155; color:#fff; border:none; padding:10px 18px; border-radius:8px; cursor:pointer;">Refresh</button>
+            </div>
+            <div id="blocklistContainer" class="blocklist-container">No IPs blocked yet.</div>
+        </div>
+    </div>
+
+        <!-- FORENSICS -->
+    <div id="forensics-tab" class="tab-content">
+        <h2>Session Explorer</h2>
+        <table id="forensicTable" style="width:100%; border-collapse:collapse; color:#cbd5e1; margin-top:20px;">
+            <thead>
+                <tr style="border-bottom:2px solid #334155; text-align:left; font-size:0.8rem; text-transform:uppercase; color:#64748b;">
+                    <th style="padding:10px;">IP Address</th>
+                    <th style="padding:10px;">Clicks</th>
+                    <th style="padding:10px;">Bots</th>
+                    <th style="padding:10px;">Humans</th>
+                    <th style="padding:10px;">Risk</th>
+                </tr>
+            </thead>
+            <tbody id="forensicBody">
+                <tr><td colspan="5" style="padding:20px; text-align:center; color:#64748b;">Loading forensic data...</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- SETTINGS -->
+    <div id="settings-tab" class="tab-content">
+        <div style="background:#1e293b; border-radius:12px; padding:25px; max-width:600px;">
+            <h2>Settings</h2>
+            <div style="margin:20px 0;">
+                <label for="rateLimitSlider" style="display:block; margin-bottom:8px;">
+                    Rate‑Limit Threshold: <span id="rateLimitValue">5</span> requests/min
+                </label>
+                <input type="range" id="rateLimitSlider" min="1" max="50" value="5"
+                       oninput="updateRateLimit(this.value)" style="width:100%;">
+                <button onclick="applyRateLimit()"
+                        style="background:#3b82f6; color:#fff; border:none; padding:10px 20px;
+                               border-radius:8px; cursor:pointer; margin-top:10px;">Apply</button>
+            </div>
+            <div style="margin:20px 0;">
+                <button onclick="exportCSV()"
+                        style="background:#10b981; color:#fff; border:none; padding:12px 24px;
+                               border-radius:8px; cursor:pointer;">Export CSV</button>
+            </div>
+            <p style="color:#94a3b8; font-size:0.9rem;">
+                To reset all demo data (rate limits, blocklist, forensic cache), run:
+            </p>
+            <pre style="background:#0b1120; padding:12px; border-radius:8px; color:#fbbf24;
+                       user-select:all;">docker exec clickguard-redis redis-cli FLUSHDB</pre>
+        </div>
+    </div>
+</main>
+
+<!-- MODAL (forensic) -->
+<div id="caseModal" class="modal">
+    <div class="modal-content">
+        <span class="close-btn" onclick="closeModal()">&times;</span>
+        <div id="caseContent"></div>
+    </div>
+</div>
+
+<script>
+    // ==================== TABS ====================
+    function switchTab(tab, el) {
+        document.querySelectorAll('.sidebar-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+        document.getElementById(tab+'-tab').classList.add('active');
+        el.classList.add('active');
+        if (tab === 'forensics') loadForensicIPGroups();
+        if (tab === 'blocklist') refreshBlocklist();
+        if (tab === 'settings') {
+            fetch(`${DEMO_API}/rate-limit`)
+                .then(r => r.json())
+                .then(data => {
+                    document.getElementById('rateLimitSlider').value = data.rate_limit_max;
+                    document.getElementById('rateLimitValue').textContent = data.rate_limit_max;
+                });
+        }
+    }
+
+    // ==================== GAUGE ====================
+    const ctx = document.getElementById('riskGauge').getContext('2d');
+    const riskGauge = new Chart(ctx, {
+        type: 'doughnut',
+        data: { datasets: [{ data: [0,100], backgroundColor: ['#ef4444','#1e293b'], borderWidth:0, circumference:180, rotation:270 }] },
+        options: { responsive:true, cutout:'80%', plugins:{ legend:{display:false}, tooltip:{enabled:false} } }
+    });
+    function updateGauge(riskScore) {
+        const val = Math.round(riskScore * 100);
+        riskGauge.data.datasets[0].data = [val, 100 - val];
+        riskGauge.update();
+        document.getElementById('gaugeValue').textContent = val + '%';
+    }
+
+    // ==================== COUNTERS ====================
+    let humanCount=0, botCount=0, rlCount=0, vpnCount=0, avgCPC=2.50;
+    function updateCPC() {
+        const v = parseFloat(document.getElementById('cpcInput').value);
+        if (!isNaN(v) && v>=0) { avgCPC = v; updateBudgetSaved(); }
+    }
+    function updateBudgetSaved() {
+        document.getElementById('budgetSaved').textContent = '$' + ((botCount+rlCount)*avgCPC).toFixed(2);
+    }
+    function incrementCounter(verdict, reason, vpn) {
+        if (verdict === 'human') humanCount++;
+        else if (verdict === 'bot') {
+            botCount++;
+            if (reason && reason.toLowerCase().includes('rate limit')) rlCount++;
+        }
+        if (vpn) vpnCount++;
+        document.getElementById('humanCount').textContent = humanCount;
+        document.getElementById('botCount').textContent = botCount;
+        document.getElementById('rlCount').textContent = rlCount;
+        document.getElementById('vpnCount').textContent = vpnCount;
+        updateBudgetSaved();
+    }
+
+    // ==================== WEBSOCKET ====================
+    const ws = new WebSocket('ws://localhost:8000/api/v1/ws/live-feed');
+    const logDiv = document.getElementById('live-log');
+    ws.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        updateGauge(data.risk_score ?? 0);
+        incrementCounter(data.verdict, data.reason, data.vpn);
+        const entry = document.createElement('div');
+        entry.className = 'log-entry ' + data.verdict;
+        const layerBadge = data.layer_triggered===1 ? 'L1' : 'L2';
+        let blacklistBadge = data.blacklisted ? ' <span class="badge blacklist">BL</span>' : '';
+        let vpnBadge = data.vpn ? ' <span class="badge vpn">VPN</span>' : '';
+        entry.innerHTML = `<strong>${data.verdict.toUpperCase()}</strong> IP ${data.ip} ${vpnBadge} <span class="badge ${layerBadge.toLowerCase()}">${layerBadge}</span> ${data.confidence?.toFixed(2)||'N/A'} ${data.reason}${blacklistBadge}`;
+        entry.dataset.sessionId = data.session_id;
+        entry.onclick = () => openCaseFile(data.session_id);
+        logDiv.prepend(entry);
+        if (logDiv.children.length > 100) logDiv.removeChild(logDiv.lastChild);
+    };
+
+    // ==================== DEMO BUTTONS ====================
+    const DEMO_API = 'http://localhost:8000/api/v1/demo';
+    async function demoHuman() { await fetch(DEMO_API+'/human',{method:'POST'}); }
+    async function demoBot() { await fetch(DEMO_API+'/bot',{method:'POST'}); }
+    async function demoRateLimit() { await fetch(DEMO_API+'/ratelimit',{method:'POST'}); }
+    async function demoMix() { await fetch(DEMO_API+'/mix',{method:'POST'}); }
+
+    // ==================== BLOCKLIST ====================
+    const ADMIN_API = 'http://localhost:8000/api/v1/admin';
+    async function addToBlocklist() {
+        const ip = document.getElementById('blocklistIpInput').value.trim();
+        if (!ip) return;
+        await fetch(`${ADMIN_API}/blacklist-ip?ip=${ip}`,{method:'POST'});
+        refreshBlocklist();
+    }
+    async function removeFromBlocklist() {
+        const ip = document.getElementById('blocklistIpInput').value.trim();
+        if (!ip) return;
+        await fetch(`${ADMIN_API}/unblacklist-ip?ip=${ip}`, { method: 'DELETE' });
+        // or keep POST if you define the endpoint as POST
+        refreshBlocklist();
+    }
+    async function refreshBlocklist() {
+        const resp = await fetch(`${ADMIN_API}/blacklisted-ips`);
+        const data = await resp.json();
+        const ips = data.blacklisted_ips || [];
+        document.getElementById('blocklistContainer').innerHTML = ips.length ? ips.map(ip=>`<span>${ip}</span>`).join('') : 'No IPs blocked yet.';
+    }
+
+    async function loadForensicIPGroups() {
+        const resp = await fetch('http://localhost:8000/api/v1/forensics/recent');
+        const data = await resp.json();
+        const sessions = data.sessions || [];
+
+        // Group by IP
+        const ipMap = {};
+        sessions.forEach(s => {
+            const ip = s.ip || 'Unknown';
+            if (!ipMap[ip]) ipMap[ip] = [];
+            ipMap[ip].push({
+                session_id: s.session_id || '',
+                verdict: s.verdict || '?',
+                layer: s.layer || '?'
+            });
+        });
+
+        // Sort IPs by risk descending
+        const ipEntries = Object.entries(ipMap)
+            .map(([ip, entries]) => ({
+                ip,
+                total: entries.length,
+                bots: entries.filter(e => e.verdict === 'bot').length,
+                humans: entries.filter(e => e.verdict === 'human').length,
+                risk: entries.length > 0 ? Math.round((entries.filter(e => e.verdict === 'bot').length / entries.length) * 100) : 0,
+                entries
+            }))
+            .sort((a, b) => b.risk - a.risk);
+
+        const tbody = document.getElementById('forensicBody');
+        if (ipEntries.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" style="padding:20px; text-align:center;">No forensic data yet.</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = ipEntries.map(ip => {
+            const riskColor = ip.risk > 70 ? '#ef4444' : ip.risk > 30 ? '#f59e0b' : '#22c55e';
+            return `
+                <tr class="ip-row" onclick="toggleIPGroup(this)" style="border-bottom:1px solid #1e293b; cursor:pointer; transition:background 0.1s;">
+                    <td style="padding:10px; font-weight:600; color:#f1f5f9;">${ip.ip}</td>
+                    <td style="padding:10px;">${ip.total}</td>
+                    <td style="padding:10px;">${ip.bots}</td>
+                    <td style="padding:10px;">${ip.humans}</td>
+                    <td style="padding:10px;">
+                        <div style="display:flex; align-items:center; gap:10px;">
+                            <div style="background:#334155; width:100px; height:6px; border-radius:3px;">
+                                <div style="width:${ip.risk}%; height:100%; background:${riskColor}; border-radius:3px;"></div>
+                            </div>
+                            <span style="font-size:0.8rem; font-weight:600;">${ip.risk}%</span>
+                        </div>
+                    </td>
+                </tr>
+                <tr class="ip-sessions" style="display:none;">
+                    <td colspan="5" style="padding:0;">
+                        <div style="background:#0f172a; padding:10px 20px; border-left:3px solid #334155; margin:4px 0;">
+                            ${ip.entries.map(e => `
+                                <div class="log-entry" onclick="event.stopPropagation(); openCaseFile('${e.session_id}')" style="margin:2px 0; cursor:pointer; padding:4px 8px; border-left:3px solid ${e.verdict==='bot'?'#ef4444':'#22c55e'};">
+                                    ${e.session_id} — ${e.verdict} (Layer ${e.layer})
+                                </div>
+                            `).join('')}
+                        </div>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    }
+
+    function toggleIPGroup(row) {
+        // The collapsible sublist is the next <tr> after the clicked row
+        const subRow = row.nextElementSibling;
+        if (subRow && subRow.classList.contains('ip-sessions')) {
+            subRow.style.display = subRow.style.display === 'none' ? '' : 'none';
+        }
+    }
+    // ==================== CASE MODAL ====================
+    function closeModal() { document.getElementById('caseModal').style.display='none'; }
+    async function openCaseFile(sessionId) {
+        document.getElementById('caseModal').style.display='block';
+        const content = document.getElementById('caseContent');
+        content.innerHTML = 'Loading...';
+        try {
+            const resp = await fetch(`http://localhost:8000/api/v1/forensics/${sessionId}`);
+            const data = await resp.json();
+            // Inside openCaseFile, after getting 'data', replace the HTML building part:
+
+            let html = `
+                <p><strong>IP:</strong> ${data.ip} &nbsp; | &nbsp; <strong>Verdict:</strong> ${data.verdict} (Layer ${data.layer}) &nbsp; | &nbsp; <strong>Reason:</strong> ${data.reason}</p>
+                <div style="display: flex; gap: 20px; margin-top: 15px;">
+                    <div style="flex: 1; min-width: 0;">
+                        <h3 style="margin-top: 0;">Behavioral Features</h3>
+                        <table style="width: 100%; font-size: 0.8rem; border-collapse: collapse;">
+                            <tbody>`;
+
+            if (data.features) {
+                for (const [k, v] of Object.entries(data.features)) {
+                    html += `<tr style="border-bottom: 1px solid #334155;">
+                                <td style="padding: 4px 8px; color: #94a3b8;">${k}</td>
+                                <td style="padding: 4px 8px; text-align: right; font-family: monospace;">${v?.toFixed(4)}</td>
+                            </tr>`;
+                }
+            }
+            html += `</tbody></table></div>
+                    <div style="flex: 1; min-width: 0;">
+                        <h3 style="margin-top: 0;">Mouse Trail Replay</h3>
+                        <canvas id="replayCanvas" width="400" height="300" style="border:1px solid #334155; background:#0b1120; width:100%; height:auto;"></canvas>
+                    </div>
+                </div>`;
+            content.innerHTML = html;
+            // ... continue with canvas animation as before
+            const canvas = document.getElementById('replayCanvas');
+            const ctx = canvas.getContext('2d');
+            const events = data.events;
+            if (events && events.length) {
+                let minX=Infinity, minY=Infinity, maxX=-Infinity, maxY=-Infinity;
+                events.forEach(e=>{ minX=Math.min(minX,e.x); minY=Math.min(minY,e.y); maxX=Math.max(maxX,e.x); maxY=Math.max(maxY,e.y); });
+                const padX=(maxX-minX)*0.1||10, padY=(maxY-minY)*0.1||10;
+                minX-=padX; maxX+=padX; minY-=padY; maxY+=padY;
+                const scaleX=canvas.width/(maxX-minX||1), scaleY=canvas.height/(maxY-minY||1);
+                const scale=Math.min(scaleX,scaleY);
+                const offsetX=(canvas.width-(maxX-minX)*scale)/2, offsetY=(canvas.height-(maxY-minY)*scale)/2;
+                let i=0;
+                function draw() {
+                    if (i>=events.length) return;
+                    const x=(events[i].x-minX)*scale+offsetX, y=(events[i].y-minY)*scale+offsetY;
+                    ctx.fillStyle='#10b981'; ctx.beginPath(); ctx.arc(x,y,2,0,2*Math.PI); ctx.fill();
+                    i++; setTimeout(draw,20);
+                }
+                draw();
+            }
+        } catch(e) { content.innerHTML='Failed to load case file.'; }
+    }
+    window.onclick = (event) => { if (event.target == document.getElementById('caseModal')) closeModal(); }
+
+    // ==================== EXPORT CSV ====================
+    function exportCSV() {
+        const rows = document.querySelectorAll('#live-log .log-entry');
+        let csv = 'Session ID,IP,Verdict,Layer,Confidence,Reason,VPN,Blacklisted\n';
+        rows.forEach(row => {
+            const sessionId = row.dataset.sessionId || '';
+            const ip = row.innerText.match(/IP ([\d\.]+)/)?.[1] || '';
+            const verdict = row.classList.contains('human') ? 'human' : 'bot';
+            const layer = row.querySelector('.badge')?.classList.contains('l1') ? 1 : 2;
+            const conf = row.innerText.match(/([\d\.]+)/)?.[1] || '';
+            const reason = row.innerText.match(/\d\) (.*?)(?:\s*$)/)?.[1] || '';
+            const vpn = row.innerText.includes('VPN') ? 'Yes' : 'No';
+            const blacklisted = row.innerText.includes('BL') ? 'Yes' : 'No';
+            csv += `${sessionId},${ip},${verdict},${layer},${conf},${reason},${vpn},${blacklisted}\n`;
+        });
+        const blob = new Blob([csv], {type:'text/csv'});
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'clickguard_export.csv';
+        a.click();
+    }
+
+    function updateRateLimit(val) {
+        document.getElementById('rateLimitValue').textContent = val;
+    }
+
+    async function applyRateLimit() {
+        const limit = document.getElementById('rateLimitSlider').value;
+        await fetch(`${DEMO_API}/set-rate-limit?limit=${limit}`, { method: 'POST' });
+        alert(`Rate limit set to ${limit} requests/min`);
+    }
+
+    // ==================== INIT ====================
+    refreshBlocklist();
+    loadForensicIPGroups();
+</script>
+</body>
+</html>

@@ -7,6 +7,12 @@ from app.core.config import settings
 from app.core.redis_client import redis_client
 from app.core.database import connect_db, disconnect_db
 from app.api.v1.endpoints import verify
+from app.api.v1.endpoints import admin
+from app.api.v1.endpoints import debug
+from app.api.v1.endpoints import ws
+from app.api.v1.endpoints import demo
+from app.api.v1.endpoints import forensics
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -60,6 +66,15 @@ app.add_middleware(
 # Include routers
 app.include_router(verify.router, prefix=settings.API_V1_STR, tags=["verification"])
 
+app.include_router(admin.router, prefix=settings.API_V1_STR, tags=["admin"])
+
+app.include_router(debug.router, prefix=settings.API_V1_STR, tags=["debug"])
+
+app.include_router(ws.router, prefix=settings.API_V1_STR, tags=["websocket"])
+
+app.include_router(demo.router, prefix=settings.API_V1_STR, tags=["demo"])
+
+app.include_router(forensics.router, prefix=settings.API_V1_STR, tags=["forensics"])
 @app.get("/")
 async def root():
     return {"message": "ClickGuard API is running"}
